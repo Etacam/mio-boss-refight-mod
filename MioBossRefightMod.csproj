@@ -13,7 +13,7 @@
 
   <ItemGroup>
     <Reference Include="MioModdingApi">
-      <HintPath>../MioModdingApi/bin/Debug/net8.0/MioModdingApi.dll</HintPath>
+      <HintPath>../lib/MioModdingApi.dll</HintPath>
     </Reference>
     <Reference Include="MioModLoader">
       <HintPath>../lib/MioModLoader.dll</HintPath>
@@ -24,7 +24,7 @@
   </ItemGroup>
 	
   <Target Name="PostBuild" AfterTargets="PostBuildEvent">
-		<Exec Condition="$(OS) == 'Windows_NT'" Command="call &quot;$(ProjectDir)post-build.bat&quot; &quot;$(TargetPath)&quot; &quot;$(ProjectName)&quot;" />
+		<Exec Condition="$(OS) == 'Windows_NT'" Command="call &quot;$(ProjectDir)post-build.bat&quot; &quot;$(TargetPath)&quot; &quot;$(ProjectName)&quot; &quot;$(TargetDir)&quot;" WorkingDirectory="$(ProjectDir)" />
 		<Exec Condition="$(OS) == 'Unix'" Command="/bin/sh ./post-build.sh" />
 	</Target>
 
