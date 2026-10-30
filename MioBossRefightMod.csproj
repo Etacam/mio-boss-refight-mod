@@ -14,12 +14,15 @@
   <ItemGroup>
     <Reference Include="MioModdingApi">
       <HintPath>../lib/MioModdingApi.dll</HintPath>
+			<Private>false</Private>
     </Reference>
     <Reference Include="MioModLoader">
       <HintPath>../lib/MioModLoader.dll</HintPath>
+			<Private>false</Private>
     </Reference>
     <Reference Include="MioBinds">
       <HintPath>../lib/MioBinds.dll</HintPath>
+			<Private>false</Private>
     </Reference>
   </ItemGroup>
 	
