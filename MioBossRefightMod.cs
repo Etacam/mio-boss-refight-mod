@@ -14,30 +14,14 @@ public unsafe class MioBossRefightMod : Mod
     // ---- ImGui enum values ----
     private const int Cond_FirstUseEver = 1 << 2;    // 4
     private const int Cond_Always = 1 << 0;    // 1
-    private const int InputTextFlags_CharsDecimal = 1 << 0;    // 1
-    private const int InputTextFlags_Password = 1 << 15;   // 32768
-    private const int Col_Text = 0;
-
-    private const int WindowFlags_NoTitleBar = 1 << 0;
-    private const int WindowFlags_NoResize = 1 << 1;
-    private const int WindowFlags_NoMove = 1 << 2;
-    private const int WindowFlags_NoScrollbar = 1 << 3;
-    private const int WindowFlags_AlwaysAutoResize = 1 << 6;
-    private const int WindowFlags_NoSavedSettings = 1 << 8;
-    private const int WindowFlags_NoMouseInputs = 1 << 9;
-    private const int WindowFlags_NoFocusOnAppearing = 1 << 12;
-    private const int WindowFlags_NoBringToFrontOnFocus = 1 << 13;
-    private const int WindowFlags_NoNavInputs = 1 << 18;
-    private const int WindowFlags_NoNavFocus = 1 << 19;
     private const int WindowFlags_NoDocking = 1 << 21;
 
     private const int VK_INSERT = 0x2D;
     [DllImport("user32.dll")] private static extern short GetAsyncKeyState(int vKey);
 
-
     private readonly Dictionary<string, BossInfo> Boss_Locations = new Dictionary<string, BossInfo>
     {
-        {"Ati", new BossInfo(-1441f, 1703f, "BOSS:SASUKE")}, // TODO: this will need extra stuff to make work
+        {"Ati", new BossInfo(-1441f, 1703f, "BOSS:SASUKE")},
         {"Egis", new BossInfo(-1680f, 1539f, "BOSS:CRABASH")},
         {"Acat", new BossInfo(-2046f, 1868f, "BOSS:BLACKSMITH")},
         {"Atmos", new BossInfo(-2650f, 1413f, "BOSS:TRAPU")},
@@ -46,12 +30,12 @@ public unsafe class MioBossRefightMod : Mod
         {"Ancille & Targa", new BossInfo(-3629f, 1846f, "BOSS:TWIN_CRABASH")},
         {"Sol & Vin", new BossInfo(-2541f, 2309f, "BOSS:TWIN")},
         {"Flora", new BossInfo(-815f, 1426f, "BOSS:VINE")},
-        {"Crow", new BossInfo(-1206f, 1638f, "BOSS:SCARECROW")},
-        {"Shii", new BossInfo(-123f, 2420f, "BOSS:SHII")}, // TODO: this will need extra stuff to make work
+        {"Crow", new BossInfo(-1229f, 1638f, "BOSS:SCARECROW")},
+        {"Shii", new BossInfo(-123f, 2420f, "BOSS:SHII")},
         {"Friends :)", new BossInfo(48, 1915f, "BOSS:SPIDY")},
         {"Nabuu", new BossInfo(-272f, 1901f, "BOSS:BAMBY")},
         {"Lombre", new BossInfo(-251f, 1634f, "BOSS:BAMBY")},
-        {"AnRa", new BossInfo(-3116f, 495f, "BOSS:PROJEKT")}, // TODO: move this to the ledge where you trigger the fight, will need extra stuff to make work
+        {"AnRa", new BossInfo(-3215f, 482f, "BOSS:PROJEKT")}, // TODO: this will need extra stuff to make work
         {"Debby", new BossInfo(-1647f, 440f, "BOSS:RAMBO")}, // TODO: this will need extra stuff to make work
         {"Sawlong", new BossInfo(-1397f, 593f, "BOSS:SAW_LONGUE")},
         {"Vlad", new BossInfo(-916f, 464f, "BOSS:WASHING_MACHINE")},
@@ -63,6 +47,7 @@ public unsafe class MioBossRefightMod : Mod
     private bool _pollPrimed;
     private string Boss_refight_request = "";
     private int Boss_refight_step = -1;
+    private bool Nexus_teleport = false;
 
     // boss health state
     private string boss_name = "";
@@ -71,7 +56,6 @@ public unsafe class MioBossRefightMod : Mod
     private float boss_init_max_health = 0f;
     private float boss_decay_health = 0f;
     private float last_hit_amount = 0f;
-
 
     public override void Initialize()
     {
@@ -121,7 +105,7 @@ public unsafe class MioBossRefightMod : Mod
         boss_name = Util.MioStringToString(*boss_data.struct_name());
 
         float delta = Math.Abs(boss_cur_health - boss_info->health.rt.cur_health);
-        if ( delta > 0.1 )
+        if (delta > 0.1)
         {
             last_hit_amount = delta;
         }
@@ -132,8 +116,7 @@ public unsafe class MioBossRefightMod : Mod
         boss_decay_health = boss_info->health.decayed_health;
     }
 
-
-    private bool Platform_save_hook( On.MioGame.On_Save_thread.orig_platform_save_game orig , Save_thread* self, uint slot, Array_unsigned_char* data)
+    private bool Platform_save_hook(On.MioGame.On_Save_thread.orig_platform_save_game orig, Save_thread* self, uint slot, Array_unsigned_char* data)
     {
         LogMessage($"Save requested for slot {slot}");
         return false;
@@ -142,8 +125,12 @@ public unsafe class MioBossRefightMod : Mod
     private void Fixed_update_Prefix(MioGame.Game* __this)
     {
         Handle_boss_refight(*__this);
+        if (Nexus_teleport)
+        {
+            __this->mio.move_to(new Vec_float_3() { Base = new _vec_storage_float_3() { x = -1389f, y = 1551f, z = 0.0f } });
+            Nexus_teleport = false;
+        }
     }
-
 
     private void PollToggle()
     {
@@ -176,7 +163,7 @@ public unsafe class MioBossRefightMod : Mod
     {
         var pos = new ImVec2 { x = 12f, y = 12f };
         var pivot = new ImVec2 { x = 0f, y = 0f };
-        var size = new ImVec2 { x = 260f, y = 220f };
+        var size = new ImVec2 { x = 260f, y = 600f };
 
         ImGui__SetNextWindowPos(&pos, Cond_FirstUseEver, &pivot);
         ImGui__SetNextWindowSize(&size, Cond_FirstUseEver);
@@ -192,13 +179,24 @@ public unsafe class MioBossRefightMod : Mod
 
                 ImGui__Separator();
 
+                Text($"Boss health: {boss_name}");
+                Text($"Current/max: {boss_cur_health:f2}/{boss_max_health:f2}");
+                Text($"Decayed: {boss_decay_health:f2}");
+                Text($"Init max: {boss_init_max_health:f2}");
+                Text($"Last hit: {last_hit_amount:f2}");
+
+                ImGui__Separator();
+
                 foreach (string boss in Boss_Locations.Keys)
                 {
-                    AddBossButton(boss);
+                    if (!AddBossButton(boss)) open = false;
                 }
 
                 ImGui__Separator();
-                Text($"Now refighting {Boss_refight_request} step {Boss_refight_step}");
+
+                if (Button("Return to Nexus", 120f)) Nexus_teleport = true;
+
+                if (Button("Close", 120f)) open = false;
                 Text("INSERT = toggle menu");
             }
             ImGui__End();
@@ -207,19 +205,21 @@ public unsafe class MioBossRefightMod : Mod
         }
     }
 
-    private void AddBossButton(string name)
+    private bool AddBossButton(string name)
     {
         if (Button(name, 120f))
         {
             Boss_refight_step = 0;
             Boss_refight_request = name;
+            return false;
         }
+        return true;
     }
 
     private void Handle_boss_refight(MioGame.Game game)
     {
         Mio mio = game.mio;
-        if (Boss_refight_step !=-1 && Boss_refight_request != "")
+        if (Boss_refight_step != -1 && Boss_refight_request != "")
         {
             BossInfo? boss = Boss_Locations.GetValueOrDefault(Boss_refight_request);
             if (boss != null)
@@ -232,11 +232,27 @@ public unsafe class MioBossRefightMod : Mod
                 else if (Boss_refight_step == 1)
                 {
                     RemoveFlag(game, boss.flag);
+                    if (Boss_refight_request == "Debby")
+                    {
+                        game.save.plotpoints.mel.quest = Plotpoints.Mel.Quest.Captured;
+                        game.save.plotpoints.mel.rambo_awoken = false;
+                    }
+                    if (Boss_refight_request == "AnRa")
+                    {
+                        RemoveFlag(game, "VOICE:HALYN");
+                    }
+                    if (Boss_refight_request == "Ati" || Boss_refight_request == "Shii")
+                    {
+                        var s = Util.StringToMioString("VOICE:HALYN");
+                        game.save.acquire(&s);
+                    }
                     Boss_refight_step++;
                 }
                 else if (Boss_refight_step == 2)
                 {
                     mio.move_to(new Vec_float_3() { Base = new _vec_storage_float_3() { x = boss.x, y = boss.y, z = 0.0f } });
+                    mio.life.health_points = mio.life.max_health_points;
+
                     Boss_refight_step = -1;
                     Boss_refight_request = "";
                 }
