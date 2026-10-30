@@ -121,11 +121,14 @@ public unsafe class MioBossRefightMod : Mod
 
     private void Boss_health_bar_prefix(TNode_Boss_fight_node bf, Boss_analyzer_state* s)
     {
+        //Hooking into the boss health bar function is the easiest way to find the active boss' health
         Val_ref boss_data = bf.d->boss_node->data;
         MioGame.Boss* boss_info = (Boss*)boss_data.mem;
 
+        // Mostly just want to display the name as a way to check that we have successfully found the current boss' health
         boss_name = Util.MioStringToString(*boss_data.struct_name());
 
+        // If the health changes, report that as the damage of the latest hit
         float delta = Math.Abs(boss_cur_health - boss_info->health.rt.cur_health);
         if (delta > 0.1)
         {
@@ -140,6 +143,7 @@ public unsafe class MioBossRefightMod : Mod
 
     private bool Platform_save_hook(On.MioGame.On_Save_thread.orig_platform_save_game orig, Save_thread* self, uint slot, Array_unsigned_char* data)
     {
+        // Hook the save function so that the game doesn't try to write to the save file
         LogMessage($"Save requested for slot {slot}");
         return false;
     }
@@ -257,6 +261,9 @@ public unsafe class MioBossRefightMod : Mod
             {
                 if (Boss_refight_step == 0)
                 {
+                    // need to teleport somewhere to ensure a boss arena isn't loaded while we remove the boss flag
+                    // for most bosses teleporting to 0,0 works fine, but that's close enough to load the AnRa and Debby arenas so we need to go somewhere else for those
+                    // (Debby's arena seems to be loaded from anywhere in the bottom part of the vessel for some reason, so this location is in the top)
                     if (Boss_refight_request == "Debby" || Boss_refight_request == "AnRa")
                     {
                         mio.move_to(new Vec_float_3() { Base = new _vec_storage_float_3() { x = -134f, y = 2454f, z = 0.0f } });
@@ -269,18 +276,22 @@ public unsafe class MioBossRefightMod : Mod
                 }
                 else if (Boss_refight_step == 1)
                 {
+                    // For most bosses we just need to remove the save flag to be able to fight the boss again
                     RemoveFlag(game, boss.flag);
                     if (Boss_refight_request == "Debby")
                     {
+                        // for Debby we should just need to change Mel's quest state
                         game.save.plotpoints.mel.quest = Plotpoints.Mel.Quest.Captured;
                         game.save.plotpoints.mel.rambo_awoken = false;
                     }
                     if (Boss_refight_request == "AnRa")
                     {
+                        // For AnRa we should just need to remove Halyn's Voice
                         RemoveFlag(game, "VOICE:HALYN");
                     }
                     if (Boss_refight_request == "Ati" || Boss_refight_request == "Shii")
                     {
+                        // Since we could potentially have removed Halyn's voice for the AnRa fight, we should give it back again to fight Ati or Shii
                         var s = Util.StringToMioString("VOICE:HALYN");
                         game.save.acquire(&s);
                     }
@@ -288,6 +299,7 @@ public unsafe class MioBossRefightMod : Mod
                 }
                 else if (Boss_refight_step == 2)
                 {
+                    // Debby and AnRa aren't working, and I was just testing whether setting the extra flags we need a second time helped (it didn't)
                     if (Boss_refight_request == "Debby")
                     {
                         game.save.plotpoints.mel.quest = Plotpoints.Mel.Quest.Captured;
@@ -299,6 +311,8 @@ public unsafe class MioBossRefightMod : Mod
                     }
                     if (Boss_refight_request == "Debby" || Boss_refight_request == "AnRa")
                     {
+                        // for Debby and Anra the previous teleport was in the top of the ship, and teleporting from the top to the bottom causes an extra teleport due to the wheel
+                        // so we need to teleport somewhere in the bottom before the actual teleport to the boss arena
                         mio.move_to(new Vec_float_3());
                     }
                     Boss_refight_step++;
@@ -309,6 +323,7 @@ public unsafe class MioBossRefightMod : Mod
                     mio.move_to(new Vec_float_3() { Base = new _vec_storage_float_3() { x = boss.x, y = boss.y, z = 0.0f } });
                     if (heal_start_option?.Value is true)
                     {
+                        // trying to heal Mio before the fight, but this doesn't seem to work
                         mio.life.health_points = mio.life.max_health_points;
                     }
 
@@ -330,7 +345,8 @@ public unsafe class MioBossRefightMod : Mod
         MioGame.String s = Util.StringToMioString(flag);
         Save_entry* entry = game.save.peek(&s);
 
-        game.save.entries.try_remove(&s, entry);
+        game.save.entries.try_remove(&s, entry); // This doesn't remove the entry, it either turns it into a duplicate of another entry, or into an empty string which becomes a duplicate of the boss flag when beating the boss again
+        // either case will cause the game to crash on startup if in a save file, so for now we've disabled saving
     }
 
     private static byte[] Utf8(string s)
