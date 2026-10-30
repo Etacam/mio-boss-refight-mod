@@ -12,7 +12,7 @@
     and nothing the loader owns has been bundled alongside it.
 
 .PARAMETER StageDir
-    The staged mod folder, e.g. bin\MioAP.
+    The staged mod folder, e.g. bin\MioBossRefightMod.
 #>
 
 [CmdletBinding()]
@@ -33,12 +33,8 @@ Get-ChildItem -Recurse -File $StageDir |
 
 # The .json files come from Mod\, the DLLs from the build output.
 $required = @(
-    'Archipelago.MultiClient.Net.dll'
-    'client.json'
-    'MioAP.dll'
+    'MioBossRefightMod.dll'
     'mod.json'
-    'nacre_carcass.json'
-    'Newtonsoft.Json.dll'
 )
 
 # PolyHook belongs to mio-mod-loader, which loads its own copies before we are

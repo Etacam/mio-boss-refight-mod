@@ -25,9 +25,9 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  PROJECT: MioAP.csproj
-  MOD_NAME: MioAP
-  STAGE_DIR: bin/MioAP
+  PROJECT: MioBossRefightMod.csproj
+  MOD_NAME: MioBossRefightMod
+  STAGE_DIR: bin/MioBossRefightMod
 
 jobs:
   build:

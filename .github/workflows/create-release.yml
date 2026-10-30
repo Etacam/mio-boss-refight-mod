@@ -19,10 +19,10 @@ permissions:
   contents: write
 
 env:
-  PROJECT: MioAP.csproj
-  MOD_NAME: MioAP
+  PROJECT: MioBossRefightMod.csproj
+  MOD_NAME: MioBossRefightMod
   # Where post-build.bat assembles the mod folder (ProjectDir\bin\ProjectName).
-  STAGE_DIR: bin/MioAP
+  STAGE_DIR: bin/MioBossRefightMod
 
 jobs:
   release:
@@ -72,7 +72,7 @@ jobs:
         run: |
           $zip = '${{ env.MOD_NAME }}-${{ github.ref_name }}.zip'
 
-          # The folder itself, not its contents, so the archive holds MioAP\...
+          # The folder itself, not its contents, so the archive holds MioBossRefightMod\...
           # and unzips straight into the game's mods directory.
           Compress-Archive -Path '${{ env.STAGE_DIR }}' -DestinationPath $zip
           "ZIP=$zip" | Out-File -FilePath $env:GITHUB_ENV -Append
