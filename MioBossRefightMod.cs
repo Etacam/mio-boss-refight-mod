@@ -57,12 +57,34 @@ public unsafe class MioBossRefightMod : Mod
     private float boss_decay_health = 0f;
     private float last_hit_amount = 0f;
 
+    private static ModMenuPage? modPage;
+
+    private ToggleOption? close_menu_option;
+    private ToggleOption? health_info_option;
+    private ToggleOption? heal_start_option;
+
     public override void Initialize()
+    {
+        Hooks();
+
+        ConnectMenus();
+    }
+
+    public void Hooks()
     {
         On.MioGame.GlobalFunctions.engine.On_gui.gui_render.Prefix += Gui_render_Prefix;
         On.MioGame.On_Save_thread.platform_save_game.Hook += Platform_save_hook;
         On.MioGame.GlobalFunctions.game.On_boss.default_boss_health_bar.Prefix += Boss_health_bar_prefix;
         On.MioGame.On_Game.fixed_update.Prefix += Fixed_update_Prefix;
+    }
+
+    public void ConnectMenus()
+    {
+        modPage = ModMenu.RegisterMod(this, "Boss Refight Mod", "Boss Refight Mod Options");
+
+        close_menu_option = modPage.RegisterToggle("close_menu", "Close Menu", true, "Close the menu after starting a boss");
+        health_info_option = modPage.RegisterToggle("health_info", "Show boss health info", false, "Show detailed information about a boss' health in the menu");
+        heal_start_option = modPage.RegisterToggle("heal_start", "Heal before fights", false, "Heals you before starting a boss (not yet implemented)");
     }
 
     private void Gui_render_Prefix()
@@ -170,7 +192,7 @@ public unsafe class MioBossRefightMod : Mod
         ImGui__SetNextWindowCollapsed(false, Cond_Always);
         ImGui__SetNextWindowBgAlpha(0.92f);
 
-        fixed (byte* title = Utf8("Boss"))
+        fixed (byte* title = Utf8("Boss Fights"))
         {
             bool open = _isOpen;
 
@@ -179,17 +201,26 @@ public unsafe class MioBossRefightMod : Mod
 
                 ImGui__Separator();
 
-                Text($"Boss health: {boss_name}");
-                Text($"Current/max: {boss_cur_health:f2}/{boss_max_health:f2}");
-                Text($"Decayed: {boss_decay_health:f2}");
-                Text($"Original max: {boss_init_max_health:f2}");
-                Text($"Last hit damage: {last_hit_amount:f2}");
+                if (health_info_option?.Value is true)
+                {
+                    Text($"Boss health: {boss_name}");
+                    Text($"Current/max: {boss_cur_health:f2}/{boss_max_health:f2}");
+                    Text($"Decayed: {boss_decay_health:f2}");
+                    Text($"Original max: {boss_init_max_health:f2}");
+                    Text($"Last hit damage: {last_hit_amount:f2}");
 
-                ImGui__Separator();
+                    ImGui__Separator();
+                }
 
                 foreach (string boss in Boss_Locations.Keys)
                 {
-                    if (!AddBossButton(boss)) open = false;
+                    if (!AddBossButton(boss))
+                    {
+                        if (close_menu_option?.Value is true)
+                        {
+                            open = false;
+                        }
+                    }
                 }
 
                 ImGui__Separator();
@@ -276,7 +307,10 @@ public unsafe class MioBossRefightMod : Mod
                 else if (Boss_refight_step == 3)
                 {
                     mio.move_to(new Vec_float_3() { Base = new _vec_storage_float_3() { x = boss.x, y = boss.y, z = 0.0f } });
-                    mio.life.health_points = mio.life.max_health_points;
+                    if (heal_start_option?.Value is true)
+                    {
+                        mio.life.health_points = mio.life.max_health_points;
+                    }
 
                     Boss_refight_step = -1;
                     Boss_refight_request = "";
