@@ -127,7 +127,7 @@ public unsafe class MioBossRefightMod : Mod
         Handle_boss_refight(*__this);
         if (Nexus_teleport)
         {
-            __this->mio.move_to(new Vec_float_3() { Base = new _vec_storage_float_3() { x = -1389f, y = 1551f, z = 0.0f } });
+            __this->mio.move_to(new Vec_float_3() { Base = new _vec_storage_float_3() { x = -1388.715332f, y = 1551.128906f, z = 0.0f } });
             Nexus_teleport = false;
         }
     }
@@ -163,7 +163,7 @@ public unsafe class MioBossRefightMod : Mod
     {
         var pos = new ImVec2 { x = 12f, y = 12f };
         var pivot = new ImVec2 { x = 0f, y = 0f };
-        var size = new ImVec2 { x = 260f, y = 600f };
+        var size = new ImVec2 { x = 150f, y = 700f };
 
         ImGui__SetNextWindowPos(&pos, Cond_FirstUseEver, &pivot);
         ImGui__SetNextWindowSize(&size, Cond_FirstUseEver);
@@ -182,8 +182,8 @@ public unsafe class MioBossRefightMod : Mod
                 Text($"Boss health: {boss_name}");
                 Text($"Current/max: {boss_cur_health:f2}/{boss_max_health:f2}");
                 Text($"Decayed: {boss_decay_health:f2}");
-                Text($"Init max: {boss_init_max_health:f2}");
-                Text($"Last hit: {last_hit_amount:f2}");
+                Text($"Original max: {boss_init_max_health:f2}");
+                Text($"Last hit damage: {last_hit_amount:f2}");
 
                 ImGui__Separator();
 
@@ -226,7 +226,14 @@ public unsafe class MioBossRefightMod : Mod
             {
                 if (Boss_refight_step == 0)
                 {
-                    mio.move_to(new Vec_float_3());
+                    if (Boss_refight_request == "Debby" || Boss_refight_request == "AnRa")
+                    {
+                        mio.move_to(new Vec_float_3() { Base = new _vec_storage_float_3() { x = -134f, y = 2454f, z = 0.0f } });
+                    }
+                    else
+                    {
+                        mio.move_to(new Vec_float_3());
+                    }
                     Boss_refight_step++;
                 }
                 else if (Boss_refight_step == 1)
@@ -249,6 +256,24 @@ public unsafe class MioBossRefightMod : Mod
                     Boss_refight_step++;
                 }
                 else if (Boss_refight_step == 2)
+                {
+                    if (Boss_refight_request == "Debby")
+                    {
+                        game.save.plotpoints.mel.quest = Plotpoints.Mel.Quest.Captured;
+                        game.save.plotpoints.mel.rambo_awoken = false;
+                    }
+                    if (Boss_refight_request == "AnRa")
+                    {
+                        RemoveFlag(game, "VOICE:HALYN");
+                    }
+                    if (Boss_refight_request == "Debby" || Boss_refight_request == "AnRa")
+                    {
+                        mio.move_to(new Vec_float_3());
+                    }
+                    Boss_refight_step++;
+                }
+
+                else if (Boss_refight_step == 3)
                 {
                     mio.move_to(new Vec_float_3() { Base = new _vec_storage_float_3() { x = boss.x, y = boss.y, z = 0.0f } });
                     mio.life.health_points = mio.life.max_health_points;
