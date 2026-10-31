@@ -63,6 +63,8 @@ public unsafe class MioBossRefightMod : Mod
     private ToggleOption? health_info_option;
     private ToggleOption? heal_start_option;
 
+    private Vec_float_3 boss_camera_pos = new Vec_float_3();
+
     public override void Initialize()
     {
         Hooks();
@@ -76,6 +78,8 @@ public unsafe class MioBossRefightMod : Mod
         On.MioGame.On_Save_thread.platform_save_game.Hook += Platform_save_hook;
         On.MioGame.GlobalFunctions.game.On_boss.default_boss_health_bar.Prefix += Boss_health_bar_prefix;
         On.MioGame.On_Game.fixed_update.Prefix += Fixed_update_Prefix;
+        On.MioGame.On_Game.update_camera.Prefix += Update_cam_prefix;
+        LogMessage("Connected hooks");
     }
 
     public void ConnectMenus()
@@ -85,6 +89,15 @@ public unsafe class MioBossRefightMod : Mod
         close_menu_option = modPage.RegisterToggle("close_menu", "Close Menu", true, "Close the menu after starting a boss");
         health_info_option = modPage.RegisterToggle("health_info", "Show boss health info", false, "Show detailed information about a boss' health in the menu");
         heal_start_option = modPage.RegisterToggle("heal_start", "Heal before fights", false, "Heals you before starting a boss (not yet implemented)");
+        LogMessage("Registered options");
+    }
+
+    private void Update_cam_prefix(Game* game)
+    {
+        if (Boss_refight_step != -1 && Boss_refight_request != "")
+        {
+            game->game_cam.position = boss_camera_pos;
+        }
     }
 
     private void Gui_render_Prefix()
@@ -147,13 +160,15 @@ public unsafe class MioBossRefightMod : Mod
         LogMessage($"Save requested for slot {slot}");
         return false;
     }
-
     private void Fixed_update_Prefix(MioGame.Game* __this)
     {
         Handle_boss_refight(*__this);
         if (Nexus_teleport)
         {
+            Vec_float_3 new_cam_pos = New_camera_pos(__this->game_cam.position, __this->mio.loco.initial_position, -1388.715332f, 1551.128906f);
             __this->mio.move_to(new Vec_float_3() { Base = new _vec_storage_float_3() { x = -1388.715332f, y = 1551.128906f, z = 0.0f } });
+            __this->game_cam.position = new_cam_pos;
+
             Nexus_teleport = false;
         }
     }
@@ -251,6 +266,13 @@ public unsafe class MioBossRefightMod : Mod
         return true;
     }
 
+    private static Vec_float_3 New_camera_pos(Vec_float_3 initial_camera_pos, Vec_float_3 initial_pos, float x, float y)
+    {
+        float x_cam_dest = initial_camera_pos.x - initial_pos.x + x;
+        float y_cam_dest = initial_camera_pos.y - initial_pos.y + y;
+        return new Vec_float_3() { Base = new _vec_storage_float_3() { x = x_cam_dest, y = y_cam_dest, z = initial_camera_pos.z } };
+    }
+
     private void Handle_boss_refight(MioGame.Game game)
     {
         Mio mio = game.mio;
@@ -264,6 +286,7 @@ public unsafe class MioBossRefightMod : Mod
                     // need to teleport somewhere to ensure a boss arena isn't loaded while we remove the boss flag
                     // for most bosses teleporting to 0,0 works fine, but that's close enough to load the AnRa and Debby arenas so we need to go somewhere else for those
                     // (Debby's arena seems to be loaded from anywhere in the bottom part of the vessel for some reason, so this location is in the top)
+                    boss_camera_pos = New_camera_pos(game.game_cam.position, game.mio.loco.initial_position, boss.x, boss.y);
                     if (Boss_refight_request == "Debby" || Boss_refight_request == "AnRa")
                     {
                         mio.move_to(new Vec_float_3() { Base = new _vec_storage_float_3() { x = -134f, y = 2454f, z = 0.0f } });
