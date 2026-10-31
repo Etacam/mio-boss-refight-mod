@@ -16,9 +16,6 @@ public unsafe class MioBossRefightMod : Mod
     private const int Cond_Always = 1 << 0;    // 1
     private const int WindowFlags_NoDocking = 1 << 21;
 
-    private const int VK_INSERT = 0x2D;
-    [DllImport("user32.dll")] private static extern short GetAsyncKeyState(int vKey);
-
     private readonly Dictionary<string, BossInfo> Boss_Locations = new Dictionary<string, BossInfo>
     {
         {"Ati", new BossInfo(-1441f, 1703f, "BOSS:SASUKE")},
@@ -43,11 +40,12 @@ public unsafe class MioBossRefightMod : Mod
 
     // ---- gui state ----
     private bool _isOpen;          // menu starts closed; INSERT opens it
-    private bool _insertWasDown;
+    private bool _keybindWasDown;
     private bool _pollPrimed;
     private string Boss_refight_request = "";
     private int Boss_refight_step = -1;
     private bool Nexus_teleport = false;
+    private Vec_float_3 boss_camera_pos = new Vec_float_3();
 
     // boss health state
     private string boss_name = "";
@@ -57,13 +55,15 @@ public unsafe class MioBossRefightMod : Mod
     private float boss_decay_health = 0f;
     private float last_hit_amount = 0f;
 
+    
+    // Mod options
     private static ModMenuPage? modPage;
 
     private ToggleOption? close_menu_option;
     private ToggleOption? health_info_option;
     private ToggleOption? heal_start_option;
+    private KeybindOption? menu_keybind;
 
-    private Vec_float_3 boss_camera_pos = new Vec_float_3();
 
     public override void Initialize()
     {
@@ -89,6 +89,7 @@ public unsafe class MioBossRefightMod : Mod
         close_menu_option = modPage.RegisterToggle("close_menu", "Close Menu", true, "Close the menu after starting a boss");
         health_info_option = modPage.RegisterToggle("health_info", "Show boss health info", false, "Show detailed information about a boss' health in the menu");
         heal_start_option = modPage.RegisterToggle("heal_start", "Heal before fights", false, "Heals you before starting a boss (not yet implemented)");
+        menu_keybind = modPage.RegisterKeybind("menu_keybind", "Boss fight menu", defaultKey: MioGame.Key.Key_insert, description: "Button to open the menu", controller: false);
         LogMessage("Registered options");
     }
 
@@ -104,7 +105,6 @@ public unsafe class MioBossRefightMod : Mod
     {
         try
         {
-            PollToggle();
             UpdateCursor();
 
             if (!_isOpen) return;
@@ -162,6 +162,7 @@ public unsafe class MioBossRefightMod : Mod
     }
     private void Fixed_update_Prefix(MioGame.Game* __this)
     {
+        PollToggle();
         Handle_boss_refight(*__this);
         if (Nexus_teleport)
         {
@@ -175,19 +176,19 @@ public unsafe class MioBossRefightMod : Mod
 
     private void PollToggle()
     {
-        bool down = (GetAsyncKeyState(VK_INSERT) & 0x8000) != 0;
+        bool down = menu_keybind?.WasPressed is true;
 
         // First frame: record the key state without acting on it, so a key
         // already held at startup doesn't register as a fresh press.
         if (!_pollPrimed)
         {
             _pollPrimed = true;
-            _insertWasDown = down;
+            _keybindWasDown = down;
             return;
         }
 
-        if (down && !_insertWasDown) _isOpen = !_isOpen;
-        _insertWasDown = down;
+        if (down && !_keybindWasDown) _isOpen = !_isOpen;
+        _keybindWasDown = down;
     }
 
     /// <summary>
