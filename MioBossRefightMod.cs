@@ -5,6 +5,7 @@ using System.Runtime.InteropServices;
 using static MioGame.GlobalFunctions.engine.gui;
 using static MioGame.GlobalFunctions.Functions;
 using System.Text;
+using MioGame.GlobalFunctions.game;
 
 namespace MioBossRefightMod;
 
@@ -24,19 +25,42 @@ public unsafe class MioBossRefightMod : Mod
         {"Atmos", new BossInfo(-2650f, 1413f, "BOSS:TRAPU")},
         {"Poltergates", new BossInfo(-2582f, 1576f, "BOSS:DOOR")},
         {"Calderon", new BossInfo(-3199f, 1752f, "BOSS:ZANGY")},
-        {"Ancille & Targa", new BossInfo(-3629f, 1846f, "BOSS:TWIN_CRABASH")},
+        {"Ancille & Targa", new BossInfo(-3643f, 1847f, "BOSS:TWIN_CRABASH")},
         {"Sol & Vin", new BossInfo(-2541f, 2309f, "BOSS:TWIN")},
         {"Flora", new BossInfo(-815f, 1426f, "BOSS:VINE")},
         {"Crow", new BossInfo(-1229f, 1638f, "BOSS:SCARECROW")},
         {"Shii", new BossInfo(-123f, 2420f, "BOSS:SHII")},
         {"Friends :)", new BossInfo(48, 1915f, "BOSS:SPIDY")},
         {"Nabuu", new BossInfo(-272f, 1901f, "BOSS:BAMBY")},
-        {"Lombre", new BossInfo(-251f, 1634f, "BOSS:BAMBY")},
+        {"Lombre", new BossInfo(-251f, 1634f, "BOSS:DEVOURER")},
         {"AnRa", new BossInfo(-3215f, 482f, "BOSS:PROJEKT")}, // TODO: this will need extra stuff to make work
         {"Debby", new BossInfo(-1647f, 440f, "BOSS:RAMBO")}, // TODO: this will need extra stuff to make work
         {"Sawlong", new BossInfo(-1397f, 593f, "BOSS:SAW_LONGUE")},
         {"Vlad", new BossInfo(-916f, 464f, "BOSS:WASHING_MACHINE")},
     };
+
+    private readonly string[] Boss_rush_order = [
+        "Egis",
+        "Acat",
+        "Flora",
+        "Crow",
+        "Calderon",
+        "Checkpoint",
+        "Atmos",
+        "Lombre",
+        "Poltergates",
+        "Nabuu",
+        "Checkpoint",
+        // "Sawlong",
+        // "Debby",
+        "Friends :)",
+        "Ancille & Targa",
+        // "AnRa",
+        "Vlad",
+        "Sol & Vin",
+        // "Ati",
+        // "Shii",
+    ];
 
     // ---- gui state ----
     private bool _isOpen;          // menu starts closed; INSERT opens it
@@ -47,6 +71,12 @@ public unsafe class MioBossRefightMod : Mod
     private bool Nexus_teleport = false;
     private Vec_float_3 boss_camera_pos = new Vec_float_3();
 
+    // boss rush state
+
+    private bool Started_boss_rush = false;
+    private int Current_boss_index = -1;
+    // private readonly int wait_between_bosses = 600;
+
     // boss health state
     private string boss_name = "";
     private float boss_cur_health = 0f;
@@ -54,6 +84,10 @@ public unsafe class MioBossRefightMod : Mod
     private float boss_init_max_health = 0f;
     private float boss_decay_health = 0f;
     private float last_hit_amount = 0f;
+    private bool boss_is_dead = false;
+
+    private bool died_recently = false;
+    private int died_recently_counter = -1;
 
     // Mod options
     private static ModMenuPage? modPage;
@@ -62,6 +96,7 @@ public unsafe class MioBossRefightMod : Mod
     private ToggleOption? health_info_option;
     private ToggleOption? heal_start_option;
     private KeybindOption? menu_keybind;
+    private NumberOption? wait_time_option;
 
     public override void Initialize()
     {
@@ -87,6 +122,7 @@ public unsafe class MioBossRefightMod : Mod
         health_info_option = modPage.RegisterToggle("health_info", "Show boss health info", false, "Show detailed information about a boss' health in the menu");
         heal_start_option = modPage.RegisterToggle("heal_start", "Heal before fights", false, "Heals you before starting a boss (not yet implemented)");
         menu_keybind = modPage.RegisterKeybind("menu_keybind", "Boss fight menu", defaultKey: MioGame.Key.Key_insert, description: "Button to open the menu", controller: false);
+        wait_time_option = modPage.RegisterNumber("wait_time", "Wait time between bosses", 7, 20, 1, 10, "How long to wait after beating a boss to move on to the next boss during boss rush");
         LogMessage("Registered options");
     }
 
@@ -149,6 +185,31 @@ public unsafe class MioBossRefightMod : Mod
         boss_init_max_health = boss_info->health.initial_max_health;
         boss_cur_health = boss_info->health.rt.cur_health;
         boss_decay_health = boss_info->health.decayed_health;
+
+        bool is_dead = boss_info->health.rt.dead;
+
+        if (!boss_is_dead && is_dead)
+        {
+            boss_is_dead = true;
+            died_recently = true;
+            died_recently_counter = 0;
+        }
+        else if (boss_is_dead && !is_dead)
+        {
+            boss_is_dead = false;
+        }
+
+    }
+
+    private bool Start_next_boss_rush_boss()
+    {
+        Current_boss_index++;
+        if (Current_boss_index < Boss_rush_order.Length)
+        {
+            RequestBoss(Boss_rush_order[Current_boss_index]);
+            return true;
+        }
+        return false;
     }
 
     private void Fixed_update_Prefix(MioGame.Game* __this)
@@ -162,6 +223,29 @@ public unsafe class MioBossRefightMod : Mod
             __this->game_cam.position = new_cam_pos;
 
             Nexus_teleport = false;
+        }
+
+        if (Started_boss_rush && Current_boss_index == -1)
+        {
+            Start_next_boss_rush_boss();
+        }
+
+        if (died_recently && died_recently_counter < (wait_time_option?.Value ?? 10) * 60)
+        {
+            died_recently_counter++;
+            if (died_recently_counter >= (wait_time_option?.Value ?? 10) * 60)
+            {
+                died_recently = false;
+                died_recently_counter = -1;
+                if (Started_boss_rush && Current_boss_index >= 0)
+                {
+                    if (!Start_next_boss_rush_boss())
+                    {
+                        Started_boss_rush = false;
+                        Current_boss_index = -1;
+                    }
+                }
+            }
         }
     }
 
@@ -209,7 +293,6 @@ public unsafe class MioBossRefightMod : Mod
 
             if (ImGui__Begin((sbyte*)title, &open, WindowFlags_NoDocking))
             {
-
                 ImGui__Separator();
 
                 if (health_info_option?.Value is true)
@@ -223,10 +306,27 @@ public unsafe class MioBossRefightMod : Mod
                     ImGui__Separator();
                 }
 
-                foreach (string boss in Boss_Locations.Keys)
+                if (!Started_boss_rush)
                 {
-                    if (!AddBossButton(boss))
+                    foreach (string boss in Boss_Locations.Keys)
                     {
+                        if (!AddBossButton(boss))
+                        {
+                            if (close_menu_option?.Value is true)
+                            {
+                                open = false;
+                            }
+                        }
+                    }
+                    ImGui__Separator();
+                }
+
+                Text("Boss rush");
+                if (!Started_boss_rush)
+                {
+                    if (Button("Start boss rush", 120f))
+                    {
+                        Started_boss_rush = true;
                         if (close_menu_option?.Value is true)
                         {
                             open = false;
@@ -234,12 +334,45 @@ public unsafe class MioBossRefightMod : Mod
                     }
                 }
 
-                ImGui__Separator();
+                if (Started_boss_rush && Current_boss_index != -1)
+                {
+                    Text("Current Boss:");
+                    Text(Boss_rush_order[Current_boss_index]);
+
+                    if (Current_boss_index < (Boss_rush_order.Length - 1))
+                    {
+                        if (Boss_rush_order[Current_boss_index] == "Checkpoint")
+                        {
+                            if (Button("Start next boss", 120f))
+                            {
+                                Start_next_boss_rush_boss();
+                                if (close_menu_option?.Value is true)
+                                {
+                                    open = false;
+                                }
+                            }
+                        }
+                    }
+
+                    if (Button("Restart current boss", 120f))
+                    {
+                        RequestBoss(Boss_rush_order[Current_boss_index]);
+                        if (close_menu_option?.Value is true)
+                        {
+                            open = false;
+                        }
+                    }
+
+                    if (Button("End boss rush", 120f))
+                    {
+                        Started_boss_rush = false;
+                        Current_boss_index = -1;
+                    }
+                }
 
                 if (Button("Return to Nexus", 120f)) Nexus_teleport = true;
 
                 if (Button("Close", 120f)) open = false;
-                Text("INSERT = toggle menu");
             }
             ImGui__End();
 
@@ -247,12 +380,25 @@ public unsafe class MioBossRefightMod : Mod
         }
     }
 
+    private void RequestBoss(string name)
+    {
+        if (name == "Checkpoint")
+        {
+            Nexus_teleport = true;
+            _isOpen = true;
+        }
+        else
+        {
+            Boss_refight_step = 0;
+            Boss_refight_request = name;
+        }
+    }
+
     private bool AddBossButton(string name)
     {
         if (Button(name, 120f))
         {
-            Boss_refight_step = 0;
-            Boss_refight_request = name;
+            RequestBoss(name);
             return false;
         }
         return true;
