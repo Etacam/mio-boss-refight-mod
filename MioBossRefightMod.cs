@@ -55,7 +55,6 @@ public unsafe class MioBossRefightMod : Mod
     private float boss_decay_health = 0f;
     private float last_hit_amount = 0f;
 
-    
     // Mod options
     private static ModMenuPage? modPage;
 
@@ -63,7 +62,6 @@ public unsafe class MioBossRefightMod : Mod
     private ToggleOption? health_info_option;
     private ToggleOption? heal_start_option;
     private KeybindOption? menu_keybind;
-
 
     public override void Initialize()
     {
@@ -75,7 +73,6 @@ public unsafe class MioBossRefightMod : Mod
     public void Hooks()
     {
         On.MioGame.GlobalFunctions.engine.On_gui.gui_render.Prefix += Gui_render_Prefix;
-        On.MioGame.On_Save_thread.platform_save_game.Hook += Platform_save_hook;
         On.MioGame.GlobalFunctions.game.On_boss.default_boss_health_bar.Prefix += Boss_health_bar_prefix;
         On.MioGame.On_Game.fixed_update.Prefix += Fixed_update_Prefix;
         On.MioGame.On_Game.update_camera.Prefix += Update_cam_prefix;
@@ -154,12 +151,6 @@ public unsafe class MioBossRefightMod : Mod
         boss_decay_health = boss_info->health.decayed_health;
     }
 
-    private bool Platform_save_hook(On.MioGame.On_Save_thread.orig_platform_save_game orig, Save_thread* self, uint slot, Array_unsigned_char* data)
-    {
-        // Hook the save function so that the game doesn't try to write to the save file
-        LogMessage($"Save requested for slot {slot}");
-        return false;
-    }
     private void Fixed_update_Prefix(MioGame.Game* __this)
     {
         PollToggle();
@@ -369,8 +360,10 @@ public unsafe class MioBossRefightMod : Mod
         MioGame.String s = Util.StringToMioString(flag);
         Save_entry* entry = game.save.peek(&s);
 
-        game.save.entries.try_remove(&s, entry); // This doesn't remove the entry, it either turns it into a duplicate of another entry, or into an empty string which becomes a duplicate of the boss flag when beating the boss again
-        // either case will cause the game to crash on startup if in a save file, so for now we've disabled saving
+        if (entry is not null)
+        {
+            entry->flags = Save_entry.Flags.None;
+        }
     }
 
     private static byte[] Utf8(string s)
